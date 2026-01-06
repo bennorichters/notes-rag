@@ -14,6 +14,9 @@ CHROMA_PATH = os.getenv("CHROMA_PATH", "./chroma_data")
 def load_notes(notes_dir: str) -> list[dict]:
     notes = []
     for path in Path(notes_dir).rglob("*.md"):
+        # Skip hidden folders (those starting with .)
+        if any(part.startswith('.') for part in path.parts):
+            continue
         text = path.read_text()
         notes.append({"path": str(path), "content": text})
     return notes
