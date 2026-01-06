@@ -40,11 +40,8 @@ dokku run notes-rag python index.py
 ### Local Usage
 
 ```bash
-# Install dependencies (using uv - recommended)
+# Install dependencies
 uv sync --extra local
-
-# Or using pip (legacy)
-pip install -r requirements-local.txt
 
 # Configure
 export API_URL=https://notes-rag.yourdomain.com

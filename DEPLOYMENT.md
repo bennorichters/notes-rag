@@ -132,11 +132,8 @@ curl https://notes-rag.yourdomain.com/health
 ### 1. Install Dependencies
 
 ```bash
-# On your local laptop (using uv - recommended)
+# On your local laptop
 uv sync --extra local
-
-# Or using pip (legacy)
-pip install -r requirements-local.txt
 ```
 
 ### 2. Configure Environment Variables
