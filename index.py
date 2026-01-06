@@ -1,15 +1,22 @@
-import ollama
 import chromadb
 import re
-import json
+import os
 from pathlib import Path
+from sentence_transformers import SentenceTransformer
 
-with open("config.json") as f:
-    config = json.load(f)
+# Load embedding model
+model = SentenceTransformer('all-MiniLM-L6-v2')
+
+# Configuration from environment variables
+NOTES_PATH = os.getenv("NOTES_PATH", "./notes")
+CHROMA_PATH = os.getenv("CHROMA_PATH", "./chroma_data")
 
 def load_notes(notes_dir: str) -> list[dict]:
     notes = []
     for path in Path(notes_dir).rglob("*.md"):
+        # Skip hidden folders (those starting with .)
+        if any(part.startswith('.') for part in path.parts):
+            continue
         text = path.read_text()
         notes.append({"path": str(path), "content": text})
     return notes
@@ -144,21 +151,24 @@ def chunk_notes(notes: list[dict]) -> list[dict]:
     return chunks
 
 # Main
-notes = load_notes(config["notes_path"])
+notes = load_notes(NOTES_PATH)
 chunks = chunk_notes(notes)
 
-client = chromadb.PersistentClient(path="./chroma_data")
+client = chromadb.PersistentClient(path=CHROMA_PATH)
 try:
     client.delete_collection("notes")
 except ValueError:
     pass
 collection = client.create_collection("notes")
 
-for chunk in chunks:
-    response = ollama.embed(model="nomic-embed-text", input=chunk["text"])
+# Batch embedding for efficiency
+texts = [chunk["text"] for chunk in chunks]
+embeddings = model.encode(texts, show_progress_bar=True)
+
+for i, chunk in enumerate(chunks):
     collection.add(
         ids=[chunk["id"]],
-        embeddings=[response["embeddings"][0]],
+        embeddings=[embeddings[i].tolist()],
         documents=[chunk["text"]],
         metadatas=[{"source": chunk["source"], "tags": ",".join(chunk["tags"])}]
     )
