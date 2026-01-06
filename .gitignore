@@ -2,6 +2,7 @@
 config.json
 chroma_data/
 venv/
+.venv/
 __pycache__/
 .env
 .env.local

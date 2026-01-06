@@ -40,7 +40,10 @@ dokku run notes-rag python index.py
 ### Local Usage
 
 ```bash
-# Install dependencies
+# Install dependencies (using uv - recommended)
+uv sync --extra local
+
+# Or using pip (legacy)
 pip install -r requirements-local.txt
 
 # Configure

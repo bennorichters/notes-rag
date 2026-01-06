@@ -1,0 +1,18 @@
+[project]
+name = "notes-rag"
+version = "0.1.0"
+description = "RAG system for markdown notes with VPS deployment"
+requires-python = ">=3.11"
+dependencies = [
+    "chromadb==0.4.22",
+    "sentence-transformers==2.3.1",
+    "fastapi==0.109.0",
+    "uvicorn[standard]==0.27.0",
+    "python-dotenv==1.0.0",
+]
+
+[project.optional-dependencies]
+local = [
+    "ollama==0.1.6",
+    "requests==2.31.0",
+]
