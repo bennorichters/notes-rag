@@ -80,10 +80,10 @@ dokku letsencrypt:cron-job --add notes-rag
 
 ```bash
 # On your local machine (where you cloned this repo)
-git remote add dokku dokku@your-vps-ip:notes-rag
+git remote add dokku [SSH_LOGIN_ALIAS]:notes-rag
 
 # Push to deploy
-git push dokku claude/rag-markdown-notes-nIONE:main
+git push dokku 
 ```
 
 ### 6. Build the RAG Index
