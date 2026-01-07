@@ -29,6 +29,7 @@ class QueryRequest(BaseModel):
 
 class QueryItem(BaseModel):
     chunk: str
+    title: str
     source: str
     tags: list[str]
 
@@ -71,6 +72,7 @@ def query(request: QueryRequest):
         items.append(
             QueryItem(
                 chunk=doc,
+                title=str(meta.get("title", "")),
                 source=str(meta.get("source", "")),
                 tags=_as_tags(meta.get("tags", [])),
             )
@@ -78,7 +80,10 @@ def query(request: QueryRequest):
 
     # return items
     return json.dumps(
-        [{"chunk": it.chunk, "source": it.source, "tags": it.tags} for it in items],
+        [
+            {"chunk": it.chunk, "title": it.title, "source": it.source, "tags": it.tags}
+            for it in items
+        ],
         ensure_ascii=False,
     )
 
@@ -105,14 +110,19 @@ def read_file_contents(path: str) -> str:
     with open(path, "r", encoding="utf-8") as f:
         return f.read()
 
+def print_sources_and_titles(json_str):
+    data = json.loads(json_str)
+    for item in data:
+        print(item.get("source") + ": " + item.get("title"))
 
-question = "Give a recipe for hachee"
+print("Ask a question about your notes")
+question = input()
 qr = QueryRequest(
     question=question,
 )
 ans = query(qr)
 print("---RAG result")
-print(ans)
+print_sources_and_titles(ans)
 print("---RAG result")
 prompt = f"""You are given:
 - A question.
@@ -145,9 +155,7 @@ Output:
 </JSON>
 """
 
-print("---- sending 1st prompt")
-print(prompt)
-print("---- sending 1st prompt")
+print("sending 1st prompt")
 
 ollama_response = ollama.chat(
     model="llama3.2",
