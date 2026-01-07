@@ -149,10 +149,11 @@ def chunk_notes(notes: list[dict]) -> list[dict]:
         tag_suffix = "\n\nTags: " + ", ".join(tags) if tags else ""
         
         for i, chunk in enumerate(chunk_markdown(content)):
+            stripped_path = note["path"][len(NOTES_PATH):]
             chunks.append({
                 "id": f"{note['path']}_{i}",
                 "text": chunk + tag_suffix,
-                "source": note["path"],
+                "source": stripped_path,
                 "tags": tags
             })
     return chunks
