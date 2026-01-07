@@ -13,22 +13,25 @@ NOTES_PATH = os.getenv("NOTES_PATH", "./notes")
 CHROMA_PATH = os.getenv("CHROMA_PATH", "./chroma_data")
 
 # Initialize
-model = SentenceTransformer('all-MiniLM-L6-v2')
+model = SentenceTransformer("all-MiniLM-L6-v2")
 
 client = chromadb.PersistentClient(
     path=CHROMA_PATH,
     settings=Settings(anonymized_telemetry=False),
 )
 
+
 # Request/Response models
 class QueryRequest(BaseModel):
     question: str
     n_results: int = 3
 
+
 class QueryItem(BaseModel):
     chunk: str
     source: str
     tags: list[str]
+
 
 def query(request: QueryRequest):
     """Query the notes RAG"""
@@ -37,11 +40,9 @@ def query(request: QueryRequest):
     # Generate embedding for question
     q_embedding = model.encode([request.question], convert_to_tensor=False)[0].tolist()
 
-
     # Query ChromaDB
     results = collection.query(
-        query_embeddings=[q_embedding],
-        n_results=request.n_results
+        query_embeddings=[q_embedding], n_results=request.n_results
     )
 
     # Extract results
@@ -54,7 +55,9 @@ def query(request: QueryRequest):
     metas = results.get("metadatas")
     if not isinstance(metas, (list, tuple)):
         metas = []
-    metadatas = metas[0] if metas and isinstance(metas[0], (list, tuple)) else list(metas)
+    metadatas = (
+        metas[0] if metas and isinstance(metas[0], (list, tuple)) else list(metas)
+    )
 
     def _as_tags(value) -> list[str]:
         if isinstance(value, list):
@@ -79,18 +82,22 @@ def query(request: QueryRequest):
         ensure_ascii=False,
     )
 
+
 def strip_surrounding_quotes(s: str) -> str:
     if len(s) >= 2 and s[0] == s[-1] and s[0] in ("'", '"'):
         return s[1:-1]
     return s
+
 
 def strip_leading_slash(s: str) -> str:
     if len(s) >= 1 and s[0] == "/":
         return s[1:]
     return s
 
+
 def full_notes_path(source: str) -> str:
     return os.path.join(NOTES_PATH, source)
+
 
 def read_file_contents(path: str) -> str:
     if not os.path.isfile(path):
@@ -98,7 +105,8 @@ def read_file_contents(path: str) -> str:
     with open(path, "r", encoding="utf-8") as f:
         return f.read()
 
-question="Give a recipe for hachee"
+
+question = "Give a recipe for hachee"
 qr = QueryRequest(
     question=question,
 )
@@ -144,7 +152,7 @@ print("---- sending 1st prompt")
 ollama_response = ollama.chat(
     model="llama3.2",
     messages=[{"role": "user", "content": prompt}],
-    options={"temperature":0}
+    options={"temperature": 0},
 )
 ol_resp = ollama_response["message"]["content"]
 
@@ -186,7 +194,7 @@ print("sending 2nd prompt")
 ollama_response = ollama.chat(
     model="llama3.2",
     messages=[{"role": "user", "content": prompt}],
-    options={"temperature":0}
+    options={"temperature": 0},
 )
 ol_resp = ollama_response["message"]["content"]
 
