@@ -125,6 +125,7 @@ Rules:
 
 Output:
 - Return only the exact `source` value of the selected item, or [NONE].
+- Do not wrap your reponse in quotes, braces, brackets or anything else.
 - Do not include explanations or any other text.
 
 <QUESTTION>
@@ -142,7 +143,8 @@ print("---- sending 1st prompt")
 
 ollama_response = ollama.chat(
     model="llama3.2",
-    messages=[{"role": "user", "content": prompt}]
+    messages=[{"role": "user", "content": prompt}],
+    options={"temperature":0}
 )
 ol_resp = ollama_response["message"]["content"]
 
@@ -183,7 +185,8 @@ print("sending 2nd prompt")
 
 ollama_response = ollama.chat(
     model="llama3.2",
-    messages=[{"role": "user", "content": prompt}]
+    messages=[{"role": "user", "content": prompt}],
+    options={"temperature":0}
 )
 ol_resp = ollama_response["message"]["content"]
 
