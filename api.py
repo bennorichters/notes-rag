@@ -30,9 +30,9 @@ class QueryRequest(BaseModel):
     question: str
     n_results: int = 3
 
-class QueryResponse(BaseModel):
-    chunks: list[str]
-    sources: list[str]
+class QueryItem(BaseModel):
+    chunk: str
+    source: str
     tags: list[str]
 
 @app.get("/health")
@@ -40,7 +40,7 @@ async def health():
     """Health check endpoint (no auth required)"""
     return {"status": "healthy"}
 
-@app.post("/query", response_model=QueryResponse)
+@app.post("/query", response_model=list[QueryItem])
 async def query(request: QueryRequest, api_key: str = Depends(verify_api_key)):
     """Query the notes RAG"""
     try:
@@ -49,7 +49,8 @@ async def query(request: QueryRequest, api_key: str = Depends(verify_api_key)):
         raise HTTPException(status_code=500, detail=f"Collection not found. Has indexing been run? Error: {str(e)}")
 
     # Generate embedding for question
-    q_embedding = model.encode(request.question).tolist()
+    q_embedding = model.encode([request.question], convert_to_tensor=False)[0].tolist()
+
 
     # Query ChromaDB
     results = collection.query(
@@ -58,19 +59,36 @@ async def query(request: QueryRequest, api_key: str = Depends(verify_api_key)):
     )
 
     # Extract results
-    chunks = results["documents"][0] if results["documents"] else []
-    metadatas = results["metadatas"][0] if results["metadatas"] else []
+    # Safely handle missing/empty keys and list-or-list-of-lists results
+    docs = results.get("documents")
+    if not isinstance(docs, (list, tuple)):
+        docs = []
+    documents = docs[0] if docs and isinstance(docs[0], (list, tuple)) else list(docs)
 
-    sources = [m.get("source", "") for m in metadatas]
-    tags = []
-    for m in metadatas:
-        tag_str = m.get("tags", "")
-        if tag_str:
-            tags.extend(tag_str.split(","))
-    tags = list(set(tags))  # Deduplicate
+    metas = results.get("metadatas")
+    if not isinstance(metas, (list, tuple)):
+        metas = []
+    metadatas = metas[0] if metas and isinstance(metas[0], (list, tuple)) else list(metas)
 
-    return QueryResponse(chunks=chunks, sources=sources, tags=tags)
+    def _as_tags(value) -> list[str]:
+        if isinstance(value, list):
+            return [str(t).strip() for t in value if str(t).strip()]
+        if isinstance(value, str):
+            return [t.strip() for t in value.split(",") if t.strip()]
+        return []
 
-if __name__ == "__main__":
+    items: list[QueryItem] = []
+    for doc, meta in zip(documents, metadatas):
+        items.append(
+            QueryItem(
+                chunk=doc,
+                source=str(meta.get("source", "")),
+                tags=_as_tags(meta.get("tags", [])),
+            )
+        )
+
+    return items
+
+#if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
