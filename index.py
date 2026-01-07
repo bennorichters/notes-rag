@@ -3,9 +3,15 @@ import re
 import os
 from pathlib import Path
 from sentence_transformers import SentenceTransformer
+from chromadb.errors import NotFoundError
+from dotenv import load_dotenv
 
 # Load embedding model
 model = SentenceTransformer('all-MiniLM-L6-v2')
+
+load_dotenv()
+
+# load_dotenv(dotenv_path=Path(__file__).resolve().parent / ".env")
 
 # Configuration from environment variables
 NOTES_PATH = os.getenv("NOTES_PATH", "./notes")
@@ -17,6 +23,7 @@ def load_notes(notes_dir: str) -> list[dict]:
         # Skip hidden folders (those starting with .)
         if any(part.startswith('.') for part in path.parts):
             continue
+
         text = path.read_text()
         notes.append({"path": str(path), "content": text})
     return notes
@@ -157,8 +164,9 @@ chunks = chunk_notes(notes)
 client = chromadb.PersistentClient(path=CHROMA_PATH)
 try:
     client.delete_collection("notes")
-except ValueError:
+except NotFoundError:
     pass
+
 collection = client.create_collection("notes")
 
 # Batch embedding for efficiency

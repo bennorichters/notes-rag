@@ -1,29 +1,22 @@
+import asyncio
 import os
 from fastapi import FastAPI, HTTPException, Security, Depends
 from fastapi.security import APIKeyHeader
 from pydantic import BaseModel
+from chromadb.config import Settings
 import chromadb
 from sentence_transformers import SentenceTransformer
 
 # Configuration
-API_KEY = os.getenv("API_KEY")
 CHROMA_PATH = os.getenv("CHROMA_PATH", "./chroma_data")
 
-if not API_KEY:
-    raise ValueError("API_KEY environment variable must be set")
-
 # Initialize
-app = FastAPI(title="Notes RAG API", version="1.0.0")
 model = SentenceTransformer('all-MiniLM-L6-v2')
-client = chromadb.PersistentClient(path=CHROMA_PATH)
 
-# API Key authentication
-api_key_header = APIKeyHeader(name="X-API-Key", auto_error=True)
-
-async def verify_api_key(api_key: str = Security(api_key_header)):
-    if api_key != API_KEY:
-        raise HTTPException(status_code=403, detail="Invalid API Key")
-    return api_key
+client = chromadb.PersistentClient(
+    path=CHROMA_PATH,
+    settings=Settings(anonymized_telemetry=False),
+)
 
 # Request/Response models
 class QueryRequest(BaseModel):
@@ -35,13 +28,7 @@ class QueryItem(BaseModel):
     source: str
     tags: list[str]
 
-@app.get("/health")
-async def health():
-    """Health check endpoint (no auth required)"""
-    return {"status": "healthy"}
-
-@app.post("/query", response_model=list[QueryItem])
-async def query(request: QueryRequest, api_key: str = Depends(verify_api_key)):
+async def query(request: QueryRequest):
     """Query the notes RAG"""
     try:
         collection = client.get_collection("notes")
@@ -89,6 +76,8 @@ async def query(request: QueryRequest, api_key: str = Depends(verify_api_key)):
 
     return items
 
-#if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+qr = QueryRequest(
+    question="what is a recipe for hachee?",
+)
+ans = asyncio.run(query(qr))
+print(ans)
