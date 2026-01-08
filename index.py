@@ -7,7 +7,7 @@ from chromadb.errors import NotFoundError
 from dotenv import load_dotenv
 
 # Load embedding model
-model = SentenceTransformer("all-MiniLM-L6-v2")
+model = SentenceTransformer("paraphrase-multilingual-MiniLM-L12-v2")
 
 load_dotenv()
 
@@ -43,7 +43,7 @@ def extract_tags(text: str) -> list[str]:
     if not lines:
         return []
     last_line = lines[-1].strip()
-    if re.match(r"^(:[a-zA-Z0-9À-ÿ-]+)+:$", last_line):
+    if re.match(r"^(:[\w-]+)+:$", last_line):
         return [t for t in last_line.split(":") if t]
     return []
 
@@ -54,7 +54,7 @@ def remove_tag_line(text: str) -> str:
     if not lines:
         return text
     last_line = lines[-1].strip()
-    if re.match(r"^(:[a-zA-Z0-9À-ÿ-]+)+:$", last_line):
+    if re.match(r"^(:[\w-]+)+:$", last_line):
         return "\n".join(lines[:-1])
     return text
 

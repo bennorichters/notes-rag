@@ -13,7 +13,7 @@ NOTES_PATH = os.getenv("NOTES_PATH", "./notes")
 CHROMA_PATH = os.getenv("CHROMA_PATH", "./chroma_data")
 
 # Initialize
-model = SentenceTransformer("all-MiniLM-L6-v2")
+model = SentenceTransformer("paraphrase-multilingual-MiniLM-L12-v2")
 
 client = chromadb.PersistentClient(
     path=CHROMA_PATH,
