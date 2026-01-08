@@ -140,7 +140,8 @@ Rules:
 Output:
 - Return a list of key words 
 - Your result is a space separated list of words
-- Do not respond with anything else
+- Do not respond with anything else but the list of keywords
+- Do not mention that you fixed typos
 
 <QUESTION>
 {question}
@@ -161,55 +162,58 @@ qr = QueryRequest(
 )
 ans = query(qr)
 data = json.loads(ans)
-print("---RAG result")
-print_sources_and_titles(data)
-print("---RAG result")
+# print("---RAG result")
+# print_sources_and_titles(data)
+# print("---RAG result")
+#
+# index_title_chunk = extract_title_chunk_with_index(data)
+#
+# prompt = f"""You are given:
+# - A question.
+# - A JSON array of items.  
+#   Each item contains:
+#   - `chunk`: an excerpt that may contain relevant information.
+#   - `title`: the title that belongs to the chunk
+#
+# Task:
+# Determine which single item’s `chunk` is most useful for answering the question.
+#
+# Rules:
+# - Select the item whose `chunk` most directly and substantially helps answer the question.
+# - If a `chunk` only contains a title or metadata but clearly indicates the full document is about the question topic, select that item.
+# - If none of the chunks are relevant, answer with [NONE].
+# - Do not combine multiple items.
+# - Do not infer beyond the given chunks.
+#
+# Output:
+# - Return only the index value of the selected item, or [NONE].
+# - Do not wrap your reponse in quotes, braces, brackets or anything else.
+# - Do not include explanations or any other text.
+#
+# <QUESTTION>
+# {index_title_chunk}
+# </QUESTION>
+#
+# <JSON>
+# {ans}
+# </JSON>
+# """
+#
+# print("sending 1st prompt")
+#
+# ollama_response = ollama.chat(
+#     model="llama3.1",
+#     messages=[{"role": "user", "content": prompt}],
+#     options={"temperature": 0},
+# )
+# ol_resp = ollama_response["message"]["content"]
+#
+# print("1st response: " + ol_resp)
 
-index_title_chunk = extract_title_chunk_with_index(data)
-
-prompt = f"""You are given:
-- A question.
-- A JSON array of items.  
-  Each item contains:
-  - `chunk`: an excerpt that may contain relevant information.
-  - `title`: the title that belongs to the chunk
-
-Task:
-Determine which single item’s `chunk` is most useful for answering the question.
-
-Rules:
-- Select the item whose `chunk` most directly and substantially helps answer the question.
-- If a `chunk` only contains a title or metadata but clearly indicates the full document is about the question topic, select that item.
-- If none of the chunks are relevant, answer with [NONE].
-- Do not combine multiple items.
-- Do not infer beyond the given chunks.
-
-Output:
-- Return only the index value of the selected item, or [NONE].
-- Do not wrap your reponse in quotes, braces, brackets or anything else.
-- Do not include explanations or any other text.
-
-<QUESTTION>
-{index_title_chunk}
-</QUESTION>
-
-<JSON>
-{ans}
-</JSON>
-"""
-
-print("sending 1st prompt")
-
-ollama_response = ollama.chat(
-    model="llama3.1",
-    messages=[{"role": "user", "content": prompt}],
-    options={"temperature": 0},
-)
-ol_resp = ollama_response["message"]["content"]
-
-print("1st response: " + ol_resp)
+ol_resp = "0"
 item = data[int(ol_resp)]["source"]
 print("source: " + item);
+
 source = strip_leading_slash(strip_surrounding_quotes(item))
 notes_file = full_notes_path(source)
 contents = read_file_contents(notes_file)
