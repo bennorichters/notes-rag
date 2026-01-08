@@ -110,10 +110,19 @@ def read_file_contents(path: str) -> str:
     with open(path, "r", encoding="utf-8") as f:
         return f.read()
 
-def print_sources_and_titles(json_str):
-    data = json.loads(json_str)
+def print_sources_and_titles(data):
     for item in data:
         print(item.get("source") + ": " + item.get("title"))
+
+def extract_title_chunk_with_index(items):
+    return [
+        {
+            "index": i,
+            "title": item.get("title"),
+            "chunk": item.get("chunk"),
+        }
+        for i, item in enumerate(items)
+    ]
 
 print("Ask a question about your notes")
 question = input()
@@ -151,16 +160,19 @@ qr = QueryRequest(
     question=ol_resp,
 )
 ans = query(qr)
+data = json.loads(ans)
 print("---RAG result")
-print_sources_and_titles(ans)
+print_sources_and_titles(data)
 print("---RAG result")
+
+index_title_chunk = extract_title_chunk_with_index(data)
 
 prompt = f"""You are given:
 - A question.
 - A JSON array of items.  
   Each item contains:
   - `chunk`: an excerpt that may contain relevant information.
-  - `source`: the identifier of the full document from which the chunk was taken.
+  - `title`: the title that belongs to the chunk
 
 Task:
 Determine which single item’s `chunk` is most useful for answering the question.
@@ -173,12 +185,12 @@ Rules:
 - Do not infer beyond the given chunks.
 
 Output:
-- Return only the exact `source` value of the selected item, or [NONE].
+- Return only the index value of the selected item, or [NONE].
 - Do not wrap your reponse in quotes, braces, brackets or anything else.
 - Do not include explanations or any other text.
 
 <QUESTTION>
-{question}
+{index_title_chunk}
 </QUESTION>
 
 <JSON>
@@ -196,8 +208,9 @@ ollama_response = ollama.chat(
 ol_resp = ollama_response["message"]["content"]
 
 print("1st response: " + ol_resp)
-
-source = strip_leading_slash(strip_surrounding_quotes(ol_resp))
+item = data[int(ol_resp)]["source"]
+print("source: " + item);
+source = strip_leading_slash(strip_surrounding_quotes(item))
 notes_file = full_notes_path(source)
 contents = read_file_contents(notes_file)
 
