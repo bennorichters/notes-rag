@@ -11,8 +11,8 @@ load_dotenv()
 NOTES_PATH = os.getenv("NOTES_PATH", "./notes")
 CHROMA_PATH = os.getenv("CHROMA_PATH", "./chroma_data")
 
-# Initialize
-model = SentenceTransformer("paraphrase-multilingual-MiniLM-L12-v2")
+# Initialize embedding model (BGE-M3: best cross-lingual alignment, 567M params)
+model = SentenceTransformer("BAAI/bge-m3")
 
 client = chromadb.PersistentClient(
     path=CHROMA_PATH,

@@ -6,8 +6,8 @@ from sentence_transformers import SentenceTransformer
 from chromadb.errors import NotFoundError
 from dotenv import load_dotenv
 
-# Load embedding model
-model = SentenceTransformer("paraphrase-multilingual-MiniLM-L12-v2")
+# Load embedding model (BGE-M3: best cross-lingual alignment, 567M params)
+model = SentenceTransformer("BAAI/bge-m3")
 
 load_dotenv()
 
