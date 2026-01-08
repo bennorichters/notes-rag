@@ -125,6 +125,7 @@ Rules:
 Output:
 - Return a list of key words
 - Your result is a space separated list of words
+- Your result is one line of text. Do not use line breaks.
 - Do not respond with anything else but the list of keywords
 - Do not mention that you fixed typos
 
