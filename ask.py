@@ -117,13 +117,44 @@ def print_sources_and_titles(json_str):
 
 print("Ask a question about your notes")
 question = input()
+
+prompt = f"""You are given a question.
+
+Task:
+Determine which keywords are used to query a RAG to retrieve documents with the most relevant information.
+
+Rules:
+- Select words from the question that are most likely to give relevant results from the RAG.
+- You are allowed to fix user typos in your response.
+- You are allowed to add words to your response that are not used in the question.
+
+Output:
+- Return a list of key words 
+- Your result is a space separated list of words
+- Do not respond with anything else
+
+<QUESTION>
+{question}
+</QUESTION>
+"""
+
+ollama_response = ollama.chat(
+    model="llama3.1",
+    messages=[{"role": "user", "content": prompt}],
+    options={"temperature": 0},
+)
+ol_resp = ollama_response["message"]["content"]
+
+print("0st response: " + ol_resp)
+
 qr = QueryRequest(
-    question=question,
+    question=ol_resp,
 )
 ans = query(qr)
 print("---RAG result")
 print_sources_and_titles(ans)
 print("---RAG result")
+
 prompt = f"""You are given:
 - A question.
 - A JSON array of items.  
@@ -158,7 +189,7 @@ Output:
 print("sending 1st prompt")
 
 ollama_response = ollama.chat(
-    model="llama3.2",
+    model="llama3.1",
     messages=[{"role": "user", "content": prompt}],
     options={"temperature": 0},
 )
@@ -200,7 +231,7 @@ Strict Guidelines:
 print("sending 2nd prompt")
 
 ollama_response = ollama.chat(
-    model="llama3.2",
+    model="llama3.1",
     messages=[{"role": "user", "content": prompt}],
     options={"temperature": 0},
 )
