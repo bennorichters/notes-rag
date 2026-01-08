@@ -162,10 +162,10 @@ qr = QueryRequest(
 )
 ans = query(qr)
 data = json.loads(ans)
-# print("---RAG result")
-# print_sources_and_titles(data)
-# print("---RAG result")
-#
+print("---RAG result")
+print_sources_and_titles(data)
+print("---RAG result")
+
 # index_title_chunk = extract_title_chunk_with_index(data)
 #
 # prompt = f"""You are given:
