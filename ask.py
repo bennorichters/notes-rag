@@ -34,60 +34,7 @@ class QueryItem(BaseModel):
     tags: list[str]
 
 
-def query(request: QueryRequest):
-    """Query the notes RAG"""
-    collection = client.get_collection("notes")
-
-    # Generate embedding for question
-    q_embedding = model.encode([request.question], convert_to_tensor=False)[0].tolist()
-
-    # Query ChromaDB
-    results = collection.query(
-        query_embeddings=[q_embedding], n_results=request.n_results
-    )
-
-    # Extract results
-    # Safely handle missing/empty keys and list-or-list-of-lists results
-    docs = results.get("documents")
-    if not isinstance(docs, (list, tuple)):
-        docs = []
-    documents = docs[0] if docs and isinstance(docs[0], (list, tuple)) else list(docs)
-
-    metas = results.get("metadatas")
-    if not isinstance(metas, (list, tuple)):
-        metas = []
-    metadatas = (
-        metas[0] if metas and isinstance(metas[0], (list, tuple)) else list(metas)
-    )
-
-    def _as_tags(value) -> list[str]:
-        if isinstance(value, list):
-            return [str(t).strip() for t in value if str(t).strip()]
-        if isinstance(value, str):
-            return [t.strip() for t in value.split(",") if t.strip()]
-        return []
-
-    items: list[QueryItem] = []
-    for doc, meta in zip(documents, metadatas):
-        items.append(
-            QueryItem(
-                chunk=doc,
-                title=str(meta.get("title", "")),
-                source=str(meta.get("source", "")),
-                tags=_as_tags(meta.get("tags", [])),
-            )
-        )
-
-    # return items
-    return json.dumps(
-        [
-            {"chunk": it.chunk, "title": it.title, "source": it.source, "tags": it.tags}
-            for it in items
-        ],
-        ensure_ascii=False,
-    )
-
-
+# Helper functions
 def strip_surrounding_quotes(s: str) -> str:
     if len(s) >= 2 and s[0] == s[-1] and s[0] in ("'", '"'):
         return s[1:-1]
@@ -110,24 +57,62 @@ def read_file_contents(path: str) -> str:
     with open(path, "r", encoding="utf-8") as f:
         return f.read()
 
+
 def print_sources_and_titles(data):
     for item in data:
         print(item.get("source") + ": " + item.get("title"))
 
-def extract_title_chunk_with_index(items):
-    return [
-        {
-            "index": i,
-            "title": item.get("title"),
-            "chunk": item.get("chunk"),
-        }
-        for i, item in enumerate(items)
-    ]
 
-print("Ask a question about your notes")
-question = input()
+# Main workflow functions
+def query_chromadb(keywords: str, n_results: int = 3) -> list[dict]:
+    """Query ChromaDB with keywords and return results."""
+    collection = client.get_collection("notes")
 
-prompt = f"""You are given a question.
+    # Generate embedding for keywords
+    q_embedding = model.encode([keywords], convert_to_tensor=False)[0].tolist()
+
+    # Query ChromaDB
+    results = collection.query(
+        query_embeddings=[q_embedding], n_results=n_results
+    )
+
+    # Extract results
+    docs = results.get("documents")
+    if not isinstance(docs, (list, tuple)):
+        docs = []
+    documents = docs[0] if docs and isinstance(docs[0], (list, tuple)) else list(docs)
+
+    metas = results.get("metadatas")
+    if not isinstance(metas, (list, tuple)):
+        metas = []
+    metadatas = (
+        metas[0] if metas and isinstance(metas[0], (list, tuple)) else list(metas)
+    )
+
+    def _as_tags(value) -> list[str]:
+        if isinstance(value, list):
+            return [str(t).strip() for t in value if str(t).strip()]
+        if isinstance(value, str):
+            return [t.strip() for t in value.split(",") if t.strip()]
+        return []
+
+    items = []
+    for doc, meta in zip(documents, metadatas):
+        items.append(
+            {
+                "chunk": doc,
+                "title": str(meta.get("title", "")),
+                "source": str(meta.get("source", "")),
+                "tags": _as_tags(meta.get("tags", [])),
+            }
+        )
+
+    return items
+
+
+def extract_keywords(question: str) -> str:
+    """Use Ollama to extract keywords from the question."""
+    prompt = f"""You are given a question.
 
 Task:
 Determine which keywords are used to query a RAG to retrieve documents with the most relevant information.
@@ -138,7 +123,7 @@ Rules:
 - You are allowed to add words to your response that are not used in the question.
 
 Output:
-- Return a list of key words 
+- Return a list of key words
 - Your result is a space separated list of words
 - Do not respond with anything else but the list of keywords
 - Do not mention that you fixed typos
@@ -148,77 +133,24 @@ Output:
 </QUESTION>
 """
 
-ollama_response = ollama.chat(
-    model="llama3.1",
-    messages=[{"role": "user", "content": prompt}],
-    options={"temperature": 0},
-)
-ol_resp = ollama_response["message"]["content"]
+    ollama_response = ollama.chat(
+        model="llama3.1",
+        messages=[{"role": "user", "content": prompt}],
+        options={"temperature": 0},
+    )
+    return ollama_response["message"]["content"]
 
-print("0st response: " + ol_resp)
 
-qr = QueryRequest(
-    question=ol_resp,
-)
-ans = query(qr)
-data = json.loads(ans)
-print("---RAG result")
-print_sources_and_titles(data)
-print("---RAG result")
+def get_document_content(source: str) -> str:
+    """Retrieve the full content of a document from its source path."""
+    cleaned_source = strip_leading_slash(strip_surrounding_quotes(source))
+    notes_file = full_notes_path(cleaned_source)
+    return read_file_contents(notes_file)
 
-# index_title_chunk = extract_title_chunk_with_index(data)
-#
-# prompt = f"""You are given:
-# - A question.
-# - A JSON array of items.  
-#   Each item contains:
-#   - `chunk`: an excerpt that may contain relevant information.
-#   - `title`: the title that belongs to the chunk
-#
-# Task:
-# Determine which single item’s `chunk` is most useful for answering the question.
-#
-# Rules:
-# - Select the item whose `chunk` most directly and substantially helps answer the question.
-# - If a `chunk` only contains a title or metadata but clearly indicates the full document is about the question topic, select that item.
-# - If none of the chunks are relevant, answer with [NONE].
-# - Do not combine multiple items.
-# - Do not infer beyond the given chunks.
-#
-# Output:
-# - Return only the index value of the selected item, or [NONE].
-# - Do not wrap your reponse in quotes, braces, brackets or anything else.
-# - Do not include explanations or any other text.
-#
-# <QUESTTION>
-# {index_title_chunk}
-# </QUESTION>
-#
-# <JSON>
-# {ans}
-# </JSON>
-# """
-#
-# print("sending 1st prompt")
-#
-# ollama_response = ollama.chat(
-#     model="llama3.1",
-#     messages=[{"role": "user", "content": prompt}],
-#     options={"temperature": 0},
-# )
-# ol_resp = ollama_response["message"]["content"]
-#
-# print("1st response: " + ol_resp)
 
-ol_resp = "0"
-item = data[int(ol_resp)]["source"]
-print("source: " + item);
-
-source = strip_leading_slash(strip_surrounding_quotes(item))
-notes_file = full_notes_path(source)
-contents = read_file_contents(notes_file)
-
-prompt = f"""Task: High-Fidelity Information Extraction
+def get_final_answer(question: str, document_content: str) -> str:
+    """Use Ollama to extract the answer from the document."""
+    prompt = f"""Task: High-Fidelity Information Extraction
 
 - Role: You are an objective and precise Research Assistant.
 - Goal: Answer the `<QUESTION>` using **only** the content provided in the `<DOCUMENT>`.
@@ -228,31 +160,61 @@ prompt = f"""Task: High-Fidelity Information Extraction
 Strict Guidelines:
 1. **Groundedness:** Treat the `<DOCUMENT>` as the absolute source of truth. Do not use prior knowledge, external facts, or assumptions. If the document does not contain the answer, respond with: "The provided document does not contain sufficient information to answer this question."
 2. **Output Structure:** - Use **Markdown** for clarity (headers, bullet points, or tables where appropriate).
-   - If the information is a process, use a numbered list. 
+   - If the information is a process, use a numbered list.
    - If the information is a list of items or facts, use bullet points.
 3. **No Meta-Talk:** Do not include introductory phrases (e.g., "According to the document...") or concluding remarks. Provide only the extracted data.
 4. **Verbatim Accuracy:** Retain specific terminology, technical names, dates, and figures exactly as they appear in the source text.
 5. **Conflict Resolution:** If the document contains internal contradictions, report exactly what the text states without trying to resolve the discrepancy.
 
---- 
+---
 
 <QUESTION>
 {question}
 </QUESTION>
 
 <DOCUMENT>
-{contents}
+{document_content}
 <DOCUMENT>
 """
 
-print("sending 2nd prompt")
+    ollama_response = ollama.chat(
+        model="llama3.1",
+        messages=[{"role": "user", "content": prompt}],
+        options={"temperature": 0},
+    )
+    return ollama_response["message"]["content"]
 
-ollama_response = ollama.chat(
-    model="llama3.1",
-    messages=[{"role": "user", "content": prompt}],
-    options={"temperature": 0},
-)
-ol_resp = ollama_response["message"]["content"]
 
-print("Final answer:")
-print(ol_resp)
+def main():
+    """Main execution flow."""
+    # Get question from user
+    print("Ask a question about your notes")
+    question = input()
+
+    # Extract keywords using Ollama
+    keywords = extract_keywords(question)
+    print("Keywords: " + keywords)
+
+    # Query RAG with keywords
+    results = query_chromadb(keywords)
+    print("---RAG result")
+    print_sources_and_titles(results)
+    print("---RAG result")
+
+    # Get the first result's source
+    source = results[0]["source"]
+    print("source: " + source)
+
+    # Retrieve full document content
+    document_content = get_document_content(source)
+
+    # Get final answer from Ollama
+    print("Generating answer...")
+    answer = get_final_answer(question, document_content)
+
+    print("Final answer:")
+    print(answer)
+
+
+if __name__ == "__main__":
+    main()
